@@ -1,18 +1,19 @@
 from langchain_core.tools import tool, InjectedToolCallId
-from langgraph.types import Command
 from langchain_core.messages import ToolMessage
-from typing import Annotated
-from langgraph.prebuilt import InjectedState
-
+from langgraph.types import Command
+from langchain.agents.tool_node import InjectedState
+from typing import Annotated, Union
+from deepagents.state import Todo, FilesystemState
 from deepagents.prompts import (
-    WRITE_TODOS_DESCRIPTION,
-    EDIT_DESCRIPTION,
-    TOOL_DESCRIPTION,
+    WRITE_TODOS_TOOL_DESCRIPTION,
+    LIST_FILES_TOOL_DESCRIPTION,
+    READ_FILE_TOOL_DESCRIPTION,
+    WRITE_FILE_TOOL_DESCRIPTION,
+    EDIT_FILE_TOOL_DESCRIPTION,
 )
-from deepagents.state import Todo, DeepAgentState
 
 
-@tool(description=WRITE_TODOS_DESCRIPTION)
+@tool(description=WRITE_TODOS_TOOL_DESCRIPTION)
 def write_todos(
     todos: list[Todo], tool_call_id: Annotated[str, InjectedToolCallId]
 ) -> Command:
@@ -26,19 +27,19 @@ def write_todos(
     )
 
 
-def ls(state: Annotated[DeepAgentState, InjectedState]) -> list[str]:
+@tool(description=LIST_FILES_TOOL_DESCRIPTION)
+def ls(state: Annotated[FilesystemState, InjectedState]) -> list[str]:
     """List all files"""
     return list(state.get("files", {}).keys())
 
 
-@tool(description=TOOL_DESCRIPTION)
+@tool(description=READ_FILE_TOOL_DESCRIPTION)
 def read_file(
     file_path: str,
-    state: Annotated[DeepAgentState, InjectedState],
+    state: Annotated[FilesystemState, InjectedState],
     offset: int = 0,
     limit: int = 2000,
 ) -> str:
-    """Read file."""
     mock_filesystem = state.get("files", {})
     if file_path not in mock_filesystem:
         return f"Error: File '{file_path}' not found"
@@ -77,13 +78,13 @@ def read_file(
     return "\n".join(result_lines)
 
 
+@tool(description=WRITE_FILE_TOOL_DESCRIPTION)
 def write_file(
     file_path: str,
     content: str,
-    state: Annotated[DeepAgentState, InjectedState],
+    state: Annotated[FilesystemState, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command:
-    """Write to a file."""
     files = state.get("files", {})
     files[file_path] = content
     return Command(
@@ -96,15 +97,15 @@ def write_file(
     )
 
 
-@tool(description=EDIT_DESCRIPTION)
+@tool(description=EDIT_FILE_TOOL_DESCRIPTION)
 def edit_file(
     file_path: str,
     old_string: str,
     new_string: str,
-    state: Annotated[DeepAgentState, InjectedState],
+    state: Annotated[FilesystemState, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
     replace_all: bool = False,
-) -> Command:
+) -> Union[Command, str]:
     """Write to a file."""
     mock_filesystem = state.get("files", {})
     # Check if file exists in mock filesystem

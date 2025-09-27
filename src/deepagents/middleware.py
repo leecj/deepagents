@@ -72,12 +72,12 @@ def _get_agents(
         PlanningMiddleware(),
         FilesystemMiddleware(),
         # TODO: Add this back when fixed
-        # AnthropicPromptCachingMiddleware(ttl="5m"),
         SummarizationMiddleware(
             model=model,
-            max_tokens_before_summary=150000,
+            max_tokens_before_summary=120000,
             messages_to_keep=20,
         ),
+        AnthropicPromptCachingMiddleware(ttl="5m", unsupported_model_behavior="ignore"),
     ]
     agents = {
         "general-purpose": create_agent(
@@ -144,7 +144,7 @@ def create_task_tool(
         async def task(
             description: str,
             subagent_type: str,
-            state: Annotated[AgentState, InjectedState],
+            state: Annotated[dict, InjectedState],
             tool_call_id: Annotated[str, InjectedToolCallId],
         ):
             if subagent_type not in agents:
@@ -173,7 +173,7 @@ def create_task_tool(
         def task(
             description: str,
             subagent_type: str,
-            state: Annotated[AgentState, InjectedState],
+            state: Annotated[dict, InjectedState],
             tool_call_id: Annotated[str, InjectedToolCallId],
         ):
             if subagent_type not in agents:

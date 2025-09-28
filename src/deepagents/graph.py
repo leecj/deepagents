@@ -32,6 +32,7 @@ def _agent_builder(
     subagents: list[SubAgent] = None,
     state_schema: Optional[StateSchemaType] = None,
     builtin_tools: Optional[list[str]] = None,
+    main_agent_tools: Optional[list[str]] = None,
     interrupt_config: Optional[ToolInterruptConfig] = None,
     config_schema: Optional[Type[Any]] = None,
     checkpointer: Optional[Checkpointer] = None,
@@ -56,9 +57,12 @@ def _agent_builder(
     if model is None:
         model = get_default_model()
     state_schema = state_schema or DeepAgentState
+    # 子智能体始终可以访问所有工具
+    all_tools_for_subagents = list(tools) + built_in_tools
+
     if not is_async:
         task_tool = _create_sync_task_tool(
-            list(tools) + built_in_tools,
+            all_tools_for_subagents,
             instructions,
             subagents or [],
             model,
@@ -66,13 +70,28 @@ def _agent_builder(
         )
     else:
         task_tool = _create_task_tool(
-            list(tools) + built_in_tools,
+            all_tools_for_subagents,
             instructions,
             subagents or [],
             model,
             state_schema,
         )
-    all_tools = built_in_tools + list(tools) + [task_tool]
+
+    # 主智能体工具过滤：只使用指定的工具或全部工具（向后兼容）
+    if main_agent_tools is not None:
+        # 将工具转换为按名称索引的字典
+        tools_by_name = {}
+        for tool_ in tools:
+            if not isinstance(tool_, BaseTool):
+                tool_ = tool(tool_)
+            tools_by_name[tool_.name] = tool_
+        # 只包含指定的工具
+        main_tools = [tools_by_name[tool_name] for tool_name in main_agent_tools if tool_name in tools_by_name]
+    else:
+        # 向后兼容：主智能体获得所有用户工具
+        main_tools = list(tools)
+
+    all_tools = built_in_tools + main_tools + [task_tool]
 
     # Should never be the case that both are specified
     if post_model_hook and interrupt_config:
@@ -105,6 +124,7 @@ def create_deep_agent(
     subagents: list[SubAgent] = None,
     state_schema: Optional[StateSchemaType] = None,
     builtin_tools: Optional[list[str]] = None,
+    main_agent_tools: Optional[list[str]] = None,
     interrupt_config: Optional[ToolInterruptConfig] = None,
     config_schema: Optional[Type[Any]] = None,
     checkpointer: Optional[Checkpointer] = None,
@@ -130,6 +150,8 @@ def create_deep_agent(
         state_schema: The schema of the deep agent. Should subclass from DeepAgentState
         builtin_tools: If not provided, all built-in tools are included. If provided,
             only the specified built-in tools are included.
+        main_agent_tools: If provided, only these tools are available to the main agent.
+            Subagents still have access to all tools. If not provided, main agent gets all tools.
         interrupt_config: Optional Dict[str, HumanInterruptConfig] mapping tool names to interrupt configs.
         config_schema: The schema of the deep agent.
         post_model_hook: Custom post model hook
@@ -142,6 +164,7 @@ def create_deep_agent(
         subagents=subagents,
         state_schema=state_schema,
         builtin_tools=builtin_tools,
+        main_agent_tools=main_agent_tools,
         interrupt_config=interrupt_config,
         config_schema=config_schema,
         checkpointer=checkpointer,
@@ -157,6 +180,7 @@ def async_create_deep_agent(
     subagents: list[SubAgent] = None,
     state_schema: Optional[StateSchemaType] = None,
     builtin_tools: Optional[list[str]] = None,
+    main_agent_tools: Optional[list[str]] = None,
     interrupt_config: Optional[ToolInterruptConfig] = None,
     config_schema: Optional[Type[Any]] = None,
     checkpointer: Optional[Checkpointer] = None,
@@ -182,6 +206,8 @@ def async_create_deep_agent(
         state_schema: The schema of the deep agent. Should subclass from DeepAgentState
         builtin_tools: If not provided, all built-in tools are included. If provided,
             only the specified built-in tools are included.
+        main_agent_tools: If provided, only these tools are available to the main agent.
+            Subagents still have access to all tools. If not provided, main agent gets all tools.
         interrupt_config: Optional Dict[str, HumanInterruptConfig] mapping tool names to interrupt configs.
         config_schema: The schema of the deep agent.
         post_model_hook: Custom post model hook
@@ -194,6 +220,7 @@ def async_create_deep_agent(
         subagents=subagents,
         state_schema=state_schema,
         builtin_tools=builtin_tools,
+        main_agent_tools=main_agent_tools,
         interrupt_config=interrupt_config,
         config_schema=config_schema,
         checkpointer=checkpointer,

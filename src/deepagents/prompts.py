@@ -196,8 +196,7 @@ When to use the Agent tool:
 - When you are instructed to execute custom slash commands. Use the Agent tool with the slash command invocation as the entire prompt. The slash command can take arguments. For example: Task(description="Check the file", prompt="/check-file path/to/file.py")
 
 When NOT to use the Agent tool:
-- If you want to read a specific file path, use the Read or Glob tool instead of the Agent tool, to find the match more quickly
-- If you are searching for a specific term or definition within a known location, use the Glob tool instead, to find the match more quickly
+- If you want to read a specific file path, use the Read tool instead of the Agent tool, to find the match more quickly
 - If you are searching for content within a specific file or set of 2-3 files, use the Read tool instead of the Agent tool, to find the match more quickly
 - Other tasks that are not related to the agent descriptions above
 

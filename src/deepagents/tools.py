@@ -1,13 +1,14 @@
 from langchain_core.tools import tool, InjectedToolCallId
 from langgraph.types import Command
 from langchain_core.messages import ToolMessage
-from typing import Annotated, Union
+from typing import Annotated, Union, Literal
 from langgraph.prebuilt import InjectedState
 
 from deepagents.prompts import (
     WRITE_TODOS_DESCRIPTION,
     EDIT_DESCRIPTION,
-    TOOL_DESCRIPTION,
+    READ_TOOL_DESCRIPTION,
+    WRITE_TOOL_DESCRIPTION,
 )
 from deepagents.state import Todo, DeepAgentState
 
@@ -31,7 +32,7 @@ def ls(state: Annotated[DeepAgentState, InjectedState]) -> list[str]:
     return list(state.get("files", {}).keys())
 
 
-@tool(description=TOOL_DESCRIPTION)
+@tool(description=READ_TOOL_DESCRIPTION)
 def read_file(
     file_path: str,
     state: Annotated[DeepAgentState, InjectedState],
@@ -77,20 +78,41 @@ def read_file(
     return "\n".join(result_lines)
 
 
+@tool(description=WRITE_TOOL_DESCRIPTION)
 def write_file(
     file_path: str,
     content: str,
     state: Annotated[DeepAgentState, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
+    mode: Literal["overwrite", "append"] = "overwrite",
+    add_newline: bool = True,
 ) -> Command:
-    """Write to a file."""
+    """写入或追加内容到文件"""
     files = state.get("files", {})
-    files[file_path] = content
+
+    if mode == "append":
+        # 追加模式
+        existing_content = files.get(file_path, "")
+
+        # 如果需要换行且文件不为空且不以换行符结尾，则添加换行
+        if add_newline and existing_content and not existing_content.endswith('\n'):
+            new_content = existing_content + '\n' + content
+        else:
+            new_content = existing_content + content
+
+        action_msg = f"追加内容到文件 {file_path}"
+    else:
+        # 覆盖模式（原有行为）
+        new_content = content
+        action_msg = f"更新文件 {file_path}"
+
+    files[file_path] = new_content
+
     return Command(
         update={
             "files": files,
             "messages": [
-                ToolMessage(f"Updated file {file_path}", tool_call_id=tool_call_id)
+                ToolMessage(action_msg, tool_call_id=tool_call_id)
             ],
         }
     )

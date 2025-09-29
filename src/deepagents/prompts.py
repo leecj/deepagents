@@ -263,7 +263,7 @@ Usage:
 - Only use emojis if the user explicitly requests it. Avoid adding emojis to files unless asked.
 - The edit will FAIL if `old_string` is not unique in the file. Either provide a larger string with more surrounding context to make it unique or use `replace_all` to change every instance of `old_string`. 
 - Use `replace_all` for replacing and renaming strings across the file. This parameter is useful if you want to rename a variable for instance."""
-TOOL_DESCRIPTION = """Reads a file from the local filesystem. You can access any file directly by using this tool.
+READ_TOOL_DESCRIPTION = """Reads a file from the local filesystem. You can access any file directly by using this tool.
 Assume this tool is able to read all files on the machine. If the User provides a path to a file assume that path is valid. It is okay to read a file that does not exist; an error will be returned.
 
 Usage:
@@ -272,5 +272,23 @@ Usage:
 - You can optionally specify a line offset and limit (especially handy for long files), but it's recommended to read the whole file by not providing these parameters
 - Any lines longer than 2000 characters will be truncated
 - Results are returned using cat -n format, with line numbers starting at 1
-- You have the capability to call multiple tools in a single response. It is always better to speculatively read multiple files as a batch that are potentially useful. 
+- You have the capability to call multiple tools in a single response. It is always better to speculatively read multiple files as a batch that are potentially useful.
 - If you read a file that exists but has empty contents you will receive a system reminder warning in place of file contents."""
+
+WRITE_TOOL_DESCRIPTION = """写入或追加内容到文件
+
+Usage:
+- file_path: 文件路径
+- content: 要写入的内容
+- mode: "overwrite"(覆盖，默认) | "append"(追加到末尾)
+- add_newline: 追加模式下是否在内容前添加换行符(默认True)
+
+Examples:
+- 追加日志: write_file("debug.log", "新的错误信息", mode="append")
+- 创建文件: write_file("report.md", "# 标题", mode="overwrite")
+- 追加章节: write_file("report.md", "## 新章节\\n内容...", mode="append")
+
+注意:
+- append模式会自动处理换行，确保内容格式正确
+- overwrite模式完全替换文件内容(向后兼容)
+"""

@@ -414,6 +414,13 @@ You can now use `build_agent` in your `langgraph.json` and deploy it with `langg
 For async tools, you can use `from deepagents import async_create_configurable_agent`
 
 
+## 发布到 PyPI
+
+- 确保已配置 `TWINE_USERNAME` 与 `TWINE_PASSWORD`（或使用 `~/.pypirc`）。
+- 执行 `scripts/publish_pypi.sh` 自动完成清理、构建与上传。
+- 如需发布到 TestPyPI，可追加 `--repository testpypi` 等 Twine 参数。
+
+
 ## Roadmap
 - [ ] Allow users to customize full system prompt
 - [ ] Code cleanliness (type hinting, docstrings, formating)

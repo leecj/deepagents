@@ -15,6 +15,6 @@ echo "开始构建 wheel 与 sdist..."
 python3 -m build
 
 echo "上传到 PyPI..."
-twine upload "$@" dist/*
+python3 -m twine upload "$@" dist/*
 
 echo "发布流程完成。"

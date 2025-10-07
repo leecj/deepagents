@@ -1,7 +1,9 @@
+import posixpath
+
 from langchain_core.tools import tool, InjectedToolCallId
 from langgraph.types import Command
 from langchain_core.messages import ToolMessage
-from typing import Annotated, Union, Literal
+from typing import Annotated, Union, Literal, Optional
 from langgraph.prebuilt import InjectedState
 
 from deepagents.prompts import (
@@ -11,6 +13,57 @@ from deepagents.prompts import (
     WRITE_TOOL_DESCRIPTION,
 )
 from deepagents.state import Todo, DeepAgentState
+
+_FILE_ROOT_PREFIXES = ("/mnt/data", "/ubuntu/data")
+
+
+def _normalize_file_key(file_path: str) -> str:
+    """将文件路径归一化为兼容状态字典的形式。"""
+    if not file_path:
+        return ""
+
+    # 统一分隔符并清理多余的 . 与 ..
+    posix_path = posixpath.normpath(file_path.replace("\\", "/").strip())
+
+    # 移除常见的容器根路径前缀
+    for prefix in _FILE_ROOT_PREFIXES:
+        if posix_path == prefix:
+            posix_path = ""
+            break
+        if posix_path.startswith(prefix + "/"):
+            posix_path = posix_path[len(prefix) + 1 :]
+            break
+
+    # 去掉可能残留的绝对路径前缀
+    if posix_path.startswith("/"):
+        posix_path = posix_path[1:]
+
+    # normpath 对空字符串会返回 "."，这里转为空字符串保持语义
+    if posix_path == ".":
+        return ""
+
+    return posix_path
+
+
+def _resolve_file_key(
+    files: Optional[dict[str, str]], file_path: str
+) -> tuple[Optional[str], str]:
+    """查找输入路径对应的真实键，并返回归一化后的路径表示。"""
+
+    files = files or {}
+    normalized_key = _normalize_file_key(file_path)
+
+    if file_path in files:
+        return file_path, normalized_key
+
+    if normalized_key and normalized_key in files:
+        return normalized_key, normalized_key
+
+    for existing_key in files.keys():
+        if _normalize_file_key(existing_key) == normalized_key:
+            return existing_key, normalized_key
+
+    return None, normalized_key
 
 
 @tool(description=WRITE_TODOS_DESCRIPTION)
@@ -40,12 +93,17 @@ def read_file(
     limit: int = 2000,
 ) -> str:
     """Read file."""
-    mock_filesystem = state.get("files", {})
-    if file_path not in mock_filesystem:
+    mock_filesystem = state.get("files", {}) or {}
+    matched_key, normalized_key = _resolve_file_key(mock_filesystem, file_path)
+    if matched_key is None:
+        if normalized_key and normalized_key != file_path:
+            return (
+                f"Error: File '{file_path}' not found (归一化路径: '{normalized_key}')"
+            )
         return f"Error: File '{file_path}' not found"
 
     # Get file content
-    content = mock_filesystem[file_path]
+    content = mock_filesystem[matched_key]
 
     # Handle empty file
     if not content or content.strip() == "":
@@ -88,25 +146,27 @@ def write_file(
     add_newline: bool = True,
 ) -> Command:
     """写入或追加内容到文件"""
-    files = state.get("files", {})
+    files = state.get("files", {}) or {}
+    matched_key, normalized_key = _resolve_file_key(files, file_path)
+    if matched_key is not None:
+        target_key = matched_key
+    else:
+        target_key = normalized_key or file_path
 
     if mode == "append":
-        # 追加模式
-        existing_content = files.get(file_path, "")
+        existing_content = files.get(target_key, "")
 
-        # 如果需要换行且文件不为空且不以换行符结尾，则添加换行
         if add_newline and existing_content and not existing_content.endswith('\n'):
             new_content = existing_content + '\n' + content
         else:
             new_content = existing_content + content
 
-        action_msg = f"追加内容到文件 {file_path}"
+        action_msg = f"追加内容到文件 {target_key}"
     else:
-        # 覆盖模式（原有行为）
         new_content = content
-        action_msg = f"更新文件 {file_path}"
+        action_msg = f"更新文件 {target_key}"
 
-    files[file_path] = new_content
+    files[target_key] = new_content
 
     return Command(
         update={
@@ -128,13 +188,18 @@ def edit_file(
     replace_all: bool = False,
 ) -> Union[Command, str]:
     """Write to a file."""
-    mock_filesystem = state.get("files", {})
-    # Check if file exists in mock filesystem
-    if file_path not in mock_filesystem:
+    mock_filesystem = state.get("files", {}) or {}
+    matched_key, normalized_key = _resolve_file_key(mock_filesystem, file_path)
+
+    if matched_key is None:
+        if normalized_key and normalized_key != file_path:
+            return (
+                f"Error: File '{file_path}' not found (归一化路径: '{normalized_key}')"
+            )
         return f"Error: File '{file_path}' not found"
 
     # Get current file content
-    content = mock_filesystem[file_path]
+    content = mock_filesystem[matched_key]
 
     # Check if old_string exists in the file
     if old_string not in content:
@@ -152,15 +217,14 @@ def edit_file(
     if replace_all:
         new_content = content.replace(old_string, new_string)
         replacement_count = content.count(old_string)
-        result_msg = f"Successfully replaced {replacement_count} instance(s) of the string in '{file_path}'"
+        mock_filesystem[matched_key] = new_content
+        result_msg = f"Successfully replaced {replacement_count} instance(s) of the string in '{matched_key}'"
     else:
         new_content = content.replace(
             old_string, new_string, 1
         )  # Replace only first occurrence
-        result_msg = f"Successfully replaced string in '{file_path}'"
-
-    # Update the mock filesystem
-    mock_filesystem[file_path] = new_content
+        mock_filesystem[matched_key] = new_content
+        result_msg = f"Successfully replaced string in '{matched_key}'"
     return Command(
         update={
             "files": mock_filesystem,

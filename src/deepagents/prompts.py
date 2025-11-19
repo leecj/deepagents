@@ -267,7 +267,7 @@ READ_TOOL_DESCRIPTION = """Reads a file from the local filesystem. You can acces
 Assume this tool is able to read all files on the machine. If the User provides a path to a file assume that path is valid. It is okay to read a file that does not exist; an error will be returned.
 
 Usage:
-- The file_path parameter must be an absolute path, not a relative path
+- file_path 参数仅包含文件名和后缀
 - By default, it reads up to 2000 lines starting from the beginning of the file
 - You can optionally specify a line offset and limit (especially handy for long files), but it's recommended to read the whole file by not providing these parameters
 - Any lines longer than 2000 characters will be truncated
@@ -278,7 +278,7 @@ Usage:
 WRITE_TOOL_DESCRIPTION = """写入或追加内容到文件
 
 Usage:
-- file_path: 文件路径
+- file_path: 文件路径（仅包含文件名和后缀）
 - content: 要写入的内容
 - mode: "overwrite"(覆盖，默认) | "append"(追加到末尾)
 - add_newline: 追加模式下是否在内容前添加换行符(默认True)
